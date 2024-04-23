@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/root/Codes/C++/Co_async/build",
-  "command": "/usr/bin/g++ -g -std=c++20 -o src/CMakeFiles/cotest.dir/main.cpp.o -c /root/Codes/C++/Co_async/src/main.cpp",
-  "file": "/root/Codes/C++/Co_async/src/main.cpp"
-}
-]

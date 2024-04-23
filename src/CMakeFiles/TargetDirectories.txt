@@ -1,5 +1,0 @@
-/root/Codes/C++/Co_async/src/CMakeFiles/edit_cache.dir
-/root/Codes/C++/Co_async/src/CMakeFiles/rebuild_cache.dir
-/root/Codes/C++/Co_async/src/src/CMakeFiles/cotest.dir
-/root/Codes/C++/Co_async/src/src/CMakeFiles/edit_cache.dir
-/root/Codes/C++/Co_async/src/src/CMakeFiles/rebuild_cache.dir
