@@ -1,8 +1,8 @@
 
 #include <chrono>
 #include <coroutine>
-#include <thread>
 #include <iostream>
+#include <thread>
 
 struct RepeatAwaiter { // awaiter(原始指针) / awaitable(operator->)
 	bool await_ready() const noexcept { return false; }
@@ -65,7 +65,6 @@ struct awaiter {
 		std::cout << "9.a new thread lauched, and will return back to caller\n";
 	}
 	void await_resume() {}
-	
 };
 task test() {
 	std::cout << "5.begin to execute coroutine body, the thread id="
@@ -74,6 +73,7 @@ task test() {
 	std::cout << "11.coroutine resumed, continue execcute coroutine body now, "
 	             "the thread id="
 	          << std::this_thread::get_id() << "\n"; //#3
+	
 }
 } // namespace Coroutine
 
@@ -81,6 +81,6 @@ int main() {
 	Coroutine::test();
 	std::cout << "10.come back to caller becuase of co_await awaiter\n";
 	std::this_thread::sleep_for(std::chrono::seconds(1));
-
+	
 	return 0;
 }
