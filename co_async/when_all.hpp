@@ -8,6 +8,7 @@
 #include <co_async/utils.hpp>
 #include <co_async/task.hpp>
 #include <co_async/return_previous.hpp>
+#include <co_async/concepts.hpp>
 
 namespace co_async {
 
