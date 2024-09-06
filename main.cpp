@@ -3,6 +3,13 @@
 #include <co_async/timer_loop.hpp>
 #include <co_async/when_any.hpp>
 #include <co_async/when_all.hpp>
+#include <sys/epoll.h>
+#include <fcntl.h> // io ctl
+#include <cerrno>
+#include <sys/ioctl.h>
+#include <thread>
+#include <unistd.h>
+#include <cstring>
 
 using namespace std::chrono_literals;
 
@@ -30,8 +37,52 @@ co_async::Task<int> hello() {
 }
 
 int main() {
-    auto t = hello();
-    loop.run(t);
-    debug(), "主函数中得到hello结果:", t.operator co_await().await_resume();
-    return 0;
+    // 把0号输入流设置为非阻塞的，这样当你的read时如果没有数据
+    // 会直接范围 EWOULDBLOCK 错误
+    int attr = 1;
+    ioctl(0, FIONBIO, &attr);
+    /* int flags = fcntl(0, F_GETFL);
+    flags |= O_NONBLOCK;
+    fcntl(0, F_SETFL); */
+
+
+    // 创建异步控制器
+    int epfd = epoll_create1(0);
+
+    //创建异步监听器
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = 0;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, fileno(stdin), &event);
+
+    while (true) {
+        struct epoll_event ebuf[10];
+        // 让它无限制等下去
+        int res = epoll_wait(epfd, ebuf, 10, 1000);
+        if (res == -1) {
+            debug(), "epoll出错了";
+        }
+        if (res == 0) {
+            debug(), "epoll 超时了 1s内没有等到任何输入";
+        }
+        for (int i = 0; i < res; i++) {
+            debug(), "等到了输入事件";
+            int fd = ebuf[i].data.fd;
+            char c;
+            while (true) {
+                int len = read(fd, &c, 1);
+                if (len <= 0) {
+                    if (errno == EWOULDBLOCK) {
+                        debug(), "前面的区域之后再探索吧";
+                        break;
+                    }
+                    debug(), "read error ", strerror(errno);
+                    break;
+                }
+                debug(), c;
+            }
+                
+        }
+    }
+    debug(), "等到stdin的输入事件";
 }
