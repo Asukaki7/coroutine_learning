@@ -2,7 +2,7 @@
 
 #include <coroutine>
 #include <chrono>
-#include <thread>
+#include <optional>
 #include <co_async/task.hpp>
 #include <co_async/rbtree.hpp>
 
@@ -24,30 +24,25 @@ struct SleepUntilPromise : RbTree<SleepUntilPromise>::RbNode, Promise<void> {
 };
 
 struct TimerLoop {
-    RbTree<SleepUntilPromise> mRbTimer{};
+    // 弱红黑树，只保留一个引用指向真正的Promise
+    RbTree<SleepUntilPromise> mRbTimer;
 
     void addTimer(SleepUntilPromise &promise) {
         mRbTimer.insert(promise);
     }
 
-    void run(std::coroutine_handle<> coroutine) {
-        while (!coroutine.done()) {
-            coroutine.resume();
-            while (!mRbTimer.empty()) {
-                if (!mRbTimer.empty()) {
-                    auto nowTime = std::chrono::system_clock::now();
-                    auto &promise = mRbTimer.front();
-                    if (promise.mExpireTime < nowTime) {
-                        mRbTimer.erase(promise);
-                        std::coroutine_handle<SleepUntilPromise>::from_promise(
-                            promise)
-                            .resume();
-                    } else {
-                        std::this_thread::sleep_until(promise.mExpireTime);
-                    }
-                }
+    std::optional<std::chrono::system_clock::duration> tryRun() {
+        while (!mRbTimer.empty()) {
+            auto nowTime = std::chrono::system_clock::now();
+            auto &promise = mRbTimer.front();
+            if (promise.mExpireTime < nowTime) {
+                mRbTimer.erase(promise);
+                std::coroutine_handle<SleepUntilPromise>::from_promise(promise).resume();
+            } else {
+                return promise.mExpireTime - nowTime;
             }
         }
+        return std::nullopt;
     }
 
     TimerLoop &operator=(TimerLoop &&) = delete;
@@ -62,23 +57,33 @@ struct SleepAwaiter {
     await_suspend(std::coroutine_handle<SleepUntilPromise> coroutine) const {
         auto &promise = coroutine.promise();
         promise.mExpireTime = mExpireTime;
-        loop.addTimer(promise);
+        mLoop.addTimer(promise);
     }
 
     void await_resume() const noexcept {}
 
-    TimerLoop &loop;
-    std::chrono::system_clock::time_point mExpireTime;
+    using ClockType = std::chrono::system_clock;
+
+    TimerLoop &mLoop;
+    ClockType::time_point mExpireTime;
 };
 
+template <class Clock, class Dur>
 inline Task<void, SleepUntilPromise>
-sleep_until(TimerLoop &loop, std::chrono::system_clock::time_point expireTime) {
-    co_await SleepAwaiter(loop, expireTime);
+sleep_until(TimerLoop &loop, std::chrono::time_point<Clock, Dur> expireTime) {
+    co_await SleepAwaiter(
+        loop, std::chrono::time_point_cast<SleepAwaiter::ClockType::duration>(
+                  expireTime));
 }
 
+template <class Rep, class Period>
 inline Task<void, SleepUntilPromise>
-sleep_for(TimerLoop &loop, std::chrono::system_clock::duration duration) {
-    co_await SleepAwaiter(loop, std::chrono::system_clock::now() + duration);
+sleep_for(TimerLoop &loop, std::chrono::duration<Rep, Period> duration) {
+    auto d =
+        std::chrono::duration_cast<SleepAwaiter::ClockType::duration>(duration);
+    if (d.count() > 0) {
+        co_await SleepAwaiter(loop, SleepAwaiter::ClockType::now() + d);
+    }
 }
 
 } // namespace co_async

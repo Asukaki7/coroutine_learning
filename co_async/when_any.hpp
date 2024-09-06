@@ -30,7 +30,7 @@ struct WhenAnyAwaiter {
         if (mTasks.empty())
             return coroutine;
         mControl.mPrevious = coroutine;
-        for (auto const &t : mTasks.subspan(0, mTasks.size() - 1))
+        for (auto const &t: mTasks.subspan(0, mTasks.size() - 1))
             t.mCoroutine.resume();
         return mTasks.back().mCoroutine;
     }
@@ -46,10 +46,23 @@ struct WhenAnyAwaiter {
 };
 
 template <class T>
-ReturnPreviousTask whenAnyHelper(auto const &t, WhenAnyCtlBlock &control,
+ReturnPreviousTask whenAnyHelper(auto &&t, WhenAnyCtlBlock &control,
                                  Uninitialized<T> &result, std::size_t index) {
     try {
-        result.putValue(co_await t);
+        result.putValue(co_await std::forward<decltype(t)>(t));
+    } catch (...) {
+        control.mException = std::current_exception();
+        co_return control.mPrevious;
+    }
+    --control.mIndex = index;
+    co_return control.mPrevious;
+}
+
+template <class = void>
+ReturnPreviousTask whenAnyHelper(auto &&t, WhenAnyCtlBlock &control,
+                                 Uninitialized<void> &, std::size_t index) {
+    try {
+        co_await std::forward<decltype(t)>(t);
     } catch (...) {
         control.mException = std::current_exception();
         co_return control.mPrevious;
@@ -81,6 +94,23 @@ template <Awaitable... Ts>
 auto when_any(Ts &&...ts) {
     return whenAnyImpl(std::make_index_sequence<sizeof...(Ts)>{},
                        std::forward<Ts>(ts)...);
+}
+
+template <Awaitable T, class Alloc = std::allocator<T>>
+Task<typename AwaitableTraits<T>::RetType>
+when_any(std::vector<T, Alloc> const &tasks) {
+    WhenAnyCtlBlock control{tasks.size()};
+    Alloc alloc = tasks.get_allocator();
+    Uninitialized<typename AwaitableTraits<T>::RetType> result;
+    {
+        std::vector<ReturnPreviousTask, Alloc> taskArray(alloc);
+        taskArray.reserve(tasks.size());
+        for (auto &task: tasks) {
+            taskArray.push_back(whenAllHelper(task, control, result));
+        }
+        co_await WhenAnyAwaiter(control, taskArray);
+    }
+    co_return result.moveValue();
 }
 
 } // namespace co_async
