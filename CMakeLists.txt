@@ -9,7 +9,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include_directories(.)
+
 
 project(co_async LANGUAGES CXX)
-
-add_subdirectory(src)
+add_executable(co_async main.cpp)
