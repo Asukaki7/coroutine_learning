@@ -28,12 +28,12 @@ struct ReturnPreviousPromise {
             *this);
     }
 
-    std::coroutine_handle<> mPrevious{};
+    std::coroutine_handle<> mPrevious;
 
     ReturnPreviousPromise &operator=(ReturnPreviousPromise &&) = delete;
 };
 
-struct ReturnPreviousTask {
+struct [[nodiscard]] ReturnPreviousTask {
     using promise_type = ReturnPreviousPromise;
 
     ReturnPreviousTask(std::coroutine_handle<promise_type> coroutine) noexcept

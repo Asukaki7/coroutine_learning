@@ -16,9 +16,13 @@ struct NonVoidHelper<void> {
     explicit NonVoidHelper() = default;
 
     template <class T>
-    constexpr friend T operator,(T &&t, NonVoidHelper) {
+    constexpr friend T &&operator,(T &&t, NonVoidHelper) {
         return std::forward<T>(t);
+    }
+
+    char const *repr() const noexcept {
+        return "NonVoidHelper";
     }
 };
 
-}
+} // namespace co_async

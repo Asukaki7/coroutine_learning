@@ -1,8 +1,8 @@
 #pragma once
 
 #include <utility>
-#include "task.hpp"
-#include "concepts.hpp"
+#include <co_async/task.hpp>
+#include <co_async/concepts.hpp>
 
 namespace co_async {
 
