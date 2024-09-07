@@ -1,13 +1,16 @@
 #pragma once
 
+#include "co_async/debug.hpp"
 #include <exception>
 #include <coroutine>
-#include <co_async/utils.hpp>
+#include <utility>
+#include <co_async/uninitialized.hpp>
 #include <co_async/previous_awaiter.hpp>
 
 namespace co_async {
 
-template <class T> struct Promise {
+template <class T>
+struct Promise {
     auto initial_suspend() noexcept {
         return std::suspend_always();
     }
@@ -39,14 +42,15 @@ template <class T> struct Promise {
         return std::coroutine_handle<Promise>::from_promise(*this);
     }
 
-    std::coroutine_handle<> mPrevious{};
+    std::coroutine_handle<> mPrevious;
     std::exception_ptr mException{};
-    Uninitialized<T> mResult;
+    Uninitialized<T> mResult; // destructed??
 
     Promise &operator=(Promise &&) = delete;
 };
 
-template <> struct Promise<void> {
+template <>
+struct Promise<void> {
     auto initial_suspend() noexcept {
         return std::suspend_always();
     }
@@ -71,22 +75,30 @@ template <> struct Promise<void> {
         return std::coroutine_handle<Promise>::from_promise(*this);
     }
 
-    std::coroutine_handle<> mPrevious{};
+    std::coroutine_handle<> mPrevious;
     std::exception_ptr mException{};
 
     Promise &operator=(Promise &&) = delete;
 };
 
-template <class T = void, class P = Promise<T>> struct Task {
+template <class T = void, class P = Promise<T>>
+struct Task {
     using promise_type = P;
 
-    Task(std::coroutine_handle<promise_type> coroutine) noexcept
+    Task(std::coroutine_handle<promise_type> coroutine = nullptr) noexcept
         : mCoroutine(coroutine) {}
 
-    Task(Task &&) = delete;
+    Task(Task &&that) noexcept : mCoroutine(that.mCoroutine) {
+        that.mCoroutine = nullptr;
+    }
+
+    Task &operator=(Task &&that) noexcept {
+        std::swap(mCoroutine, that.mCoroutine);
+    }
 
     ~Task() {
-        mCoroutine.destroy();
+        if (mCoroutine)
+            mCoroutine.destroy();
     }
 
     struct Awaiter {
@@ -96,7 +108,8 @@ template <class T = void, class P = Promise<T>> struct Task {
 
         std::coroutine_handle<promise_type>
         await_suspend(std::coroutine_handle<> coroutine) const noexcept {
-            mCoroutine.promise().mPrevious = coroutine;
+            promise_type &promise = mCoroutine.promise();
+            promise.mPrevious = coroutine;
             return mCoroutine;
         }
 
@@ -111,11 +124,20 @@ template <class T = void, class P = Promise<T>> struct Task {
         return Awaiter(mCoroutine);
     }
 
-    operator std::coroutine_handle<>() const noexcept {
+    operator std::coroutine_handle<promise_type>() const noexcept {
         return mCoroutine;
     }
 
+private:
     std::coroutine_handle<promise_type> mCoroutine;
+};
+
+template <class Loop, class T, class P>
+T run_task(Loop &loop, Task<T, P> const &t) {
+    auto a = t.operator co_await();
+    a.await_suspend(std::noop_coroutine()).resume();
+    loop.run();
+    return a.await_resume();
 };
 
 } // namespace co_async
