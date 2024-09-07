@@ -1,9 +1,9 @@
 #pragma once
 
 #include <utility>
-#include "task.hpp"
-#include "concepts.hpp"
-#include "make_awaitable.hpp"
+#include <co_async/task.hpp>
+#include <co_async/concepts.hpp>
+#include <co_async/make_awaitable.hpp>
 
 namespace co_async {
 

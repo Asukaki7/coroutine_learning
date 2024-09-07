@@ -8,11 +8,21 @@ namespace co_async {
 
 template <class Value, class Compare = std::less<Value>>
 struct RbTree {
-    enum RbColor { RED, BLACK };
+    enum RbColor {
+        RED,
+        BLACK
+    };
 
     struct RbNode {
-        RbNode() noexcept : left(nullptr), right(nullptr), parent(nullptr), tree(nullptr), color(RED) {}
+        RbNode() noexcept
+            : left(nullptr),
+              right(nullptr),
+              parent(nullptr),
+              tree(nullptr),
+              color(RED) {}
+
         RbNode(RbNode &&) = delete;
+
         ~RbNode() noexcept {
             if (tree) {
                 tree->doErase(this);
@@ -22,23 +32,23 @@ struct RbTree {
         friend struct RbTree;
 
     private:
-        RbNode* left;
-        RbNode* right;
-        RbNode* parent;
-        RbTree* tree;
+        RbNode *left;
+        RbNode *right;
+        RbNode *parent;
+        RbTree *tree;
         RbColor color;
     };
 
 private:
-    RbNode* root;
+    RbNode *root;
     Compare comp;
 
-    bool compare(RbNode* left, RbNode* right) const noexcept {
+    bool compare(RbNode *left, RbNode *right) const noexcept {
         return comp(static_cast<Value &>(*left), static_cast<Value &>(*right));
     }
 
-    void rotateLeft(RbNode* node) noexcept {
-        RbNode* rightChild = node->right;
+    void rotateLeft(RbNode *node) noexcept {
+        RbNode *rightChild = node->right;
         node->right = rightChild->left;
         if (rightChild->left != nullptr) {
             rightChild->left->parent = node;
@@ -55,8 +65,8 @@ private:
         node->parent = rightChild;
     }
 
-    void rotateRight(RbNode* node) noexcept {
-        RbNode* leftChild = node->left;
+    void rotateRight(RbNode *node) noexcept {
+        RbNode *leftChild = node->left;
         node->left = leftChild->right;
         if (leftChild->right != nullptr) {
             leftChild->right->parent = node;
@@ -73,16 +83,17 @@ private:
         node->parent = leftChild;
     }
 
-    void fixViolation(RbNode* node) noexcept {
-        RbNode* parent = nullptr;
-        RbNode* grandParent = nullptr;
+    void fixViolation(RbNode *node) noexcept {
+        RbNode *parent = nullptr;
+        RbNode *grandParent = nullptr;
 
-        while (node != root && node->color != BLACK && node->parent->color == RED) {
+        while (node != root && node->color != BLACK &&
+               node->parent->color == RED) {
             parent = node->parent;
             grandParent = parent->parent;
 
             if (parent == grandParent->left) {
-                RbNode* uncle = grandParent->right;
+                RbNode *uncle = grandParent->right;
 
                 if (uncle != nullptr && uncle->color == RED) {
                     grandParent->color = RED;
@@ -100,7 +111,7 @@ private:
                     node = parent;
                 }
             } else {
-                RbNode* uncle = grandParent->left;
+                RbNode *uncle = grandParent->left;
 
                 if (uncle != nullptr && uncle->color == RED) {
                     grandParent->color = RED;
@@ -123,14 +134,14 @@ private:
         root->color = BLACK;
     }
 
-    void doInsert(RbNode* node) noexcept {
+    void doInsert(RbNode *node) noexcept {
         node->left = nullptr;
         node->right = nullptr;
         node->tree = this;
         node->color = RED;
 
-        RbNode* parent = nullptr;
-        RbNode* current = root;
+        RbNode *parent = nullptr;
+        RbNode *current = root;
 
         while (current != nullptr) {
             parent = current;
@@ -209,15 +220,15 @@ private:
     /*     } */
     /* } */
 
-    void doErase(RbNode* current) noexcept {
+    void doErase(RbNode *current) noexcept {
         current->tree = nullptr;
 
-        RbNode* node = nullptr;
-        RbNode* child = nullptr;
+        RbNode *node = nullptr;
+        RbNode *child = nullptr;
         RbColor color = RED;
 
         if (current->left != nullptr && current->right != nullptr) {
-            RbNode* replace = current;
+            RbNode *replace = current;
             replace = replace->right;
             while (replace->left != nullptr) {
                 replace = replace->left;
@@ -268,16 +279,16 @@ private:
         }
     }
 
-    RbNode* getFront() const noexcept {
-        RbNode* current = root;
+    RbNode *getFront() const noexcept {
+        RbNode *current = root;
         while (current->left != nullptr) {
             current = current->left;
         }
         return current;
     }
 
-    RbNode* getBack() const noexcept {
-        RbNode* current = root;
+    RbNode *getBack() const noexcept {
+        RbNode *current = root;
         while (current->right != nullptr) {
             current = current->right;
         }
@@ -285,7 +296,7 @@ private:
     }
 
     template <class Visitor>
-    void doTraversalInorder(RbNode* node, Visitor &&visitor) {
+    void doTraversalInorder(RbNode *node, Visitor &&visitor) {
         if (node == nullptr) {
             return;
         }
@@ -297,8 +308,13 @@ private:
 
 public:
     RbTree() noexcept : root(nullptr) {}
-    explicit RbTree(Compare comp) noexcept(noexcept(Compare(comp))) : root(nullptr), comp(comp) {}
+
+    explicit RbTree(Compare comp) noexcept(noexcept(Compare(comp)))
+        : root(nullptr),
+          comp(comp) {}
+
     RbTree(RbTree &&) = delete;
+
     ~RbTree() noexcept {}
 
     void insert(Value &value) noexcept {
@@ -327,4 +343,4 @@ public:
     }
 };
 
-}
+} // namespace co_async
