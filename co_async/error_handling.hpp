@@ -5,34 +5,49 @@
 #if !defined(NDEBUG)
 #include <source_location>
 #endif
-#include <vector>
-
 
 namespace co_async {
 
-    /// @brief  把c语言errno 转换为C++ 异常-1是因为linux系统对于-1都有各种错误
-    /// @param res
-    /// @return
 #if !defined(NDEBUG)
-    auto checkError(auto res, std::source_location const& loc = std::source_location::current()) {
-        if (res == -1) [[unlikely]] {
-            throw std::system_error(errno, std::system_category(),
-                (std::string)loc.file_name() + ":" + std::to_string(loc.line()));
-        }
-        return res;
+auto checkError(auto res, std::source_location const &loc =
+                              std::source_location::current()) {
+    if (res == -1) [[unlikely]] {
+        throw std::system_error(errno, std::system_category(),
+                                (std::string)loc.file_name() + ":" +
+                                    std::to_string(loc.line()));
     }
-#else 
-    auto checkError(auto res) {
-        if (res == -1) [[unlikely]] {
-            throw std::system_error(errno, std::system_category());
-        }
-        return res;
-    }
-#endif
-
+    return res;
 }
 
+auto checkErrorNonBlock(auto res, int blockres = 0, int blockerr = EWOULDBLOCK, std::source_location const &loc =
+                                         std::source_location::current()) {
+    if (res == -1) {
+        if (errno != blockerr) [[unlikely]] {
+            throw std::system_error(errno, std::system_category(),
+                                    (std::string)loc.file_name() + ":" +
+                                        std::to_string(loc.line()));
+        }
+        res = blockres;
+    }
+    return res;
+}
+#else
+auto checkError(auto res) {
+    if (res == -1) [[unlikely]] {
+        throw std::system_error(errno, std::system_category());
+    }
+    return res;
+}
 
+auto checkErrorExceptBlock(auto res, int blockres = 0, int blockerr = EWOULDBLOCK) {
+    if (res == -1) {
+        if (errno != blockerr) [[unlikely]] {
+            throw std::system_error(errno, std::system_category());
+        }
+        res = blockres;
+    }
+    return res;
+}
+#endif
 
-
-
+} // namespace co_async

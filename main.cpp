@@ -8,12 +8,11 @@
 #include <co_async/when_all.hpp>
 #include <co_async/limit_timeout.hpp>
 #include <co_async/and_then.hpp>
+#include <co_async/socket.hpp>
 #include <cstring>
 #include <termios.h>
 
-
 [[gnu::constructor]] static void disable_canon() {
-    // 获取与终端相关的参数
     struct termios tc;
     tcgetattr(STDIN_FILENO, &tc);
     tc.c_lflag &= ~ICANON;
@@ -21,17 +20,19 @@
     tcsetattr(STDIN_FILENO, TCSANOW, &tc);
 }
 
-using namespace std::chrono_literals;
+using namespace std::literals;
 
 co_async::AsyncLoop loop;
 
 co_async::Task<> amain() {
-    co_async::AsyncFile file(STDIN_FILENO);
-    while (true) {
-        auto res = co_await co_async::when_any(
-            co_async::sleep_for(loop, 1s), co_async::read_string(loop, file));
-        debug(), res;
-    }
+    auto sock = co_async::tcp_socket<co_async::Ipv4Address>();
+    co_await socket_connect(loop, sock, co_async::Ipv4Address("192.168.0.0", 8080));
+    co_await socket_send(loop, sock, "GET / HTTP/1.1\r\nHost: 142857.red\r\nUser-Agent: co_async\r\n\r\n"sv);
+    char buf[4096];
+    auto len = co_await socket_recv(loop, sock, buf);
+    std::string_view res(buf, len);
+    std::cout << res;
+    co_return;
 }
 
 int main() {
