@@ -26,11 +26,11 @@ struct EpollFilePromise : Promise<EpollEventMask> {
 
     inline ~EpollFilePromise();
 
-    struct EpollFileAwaiter *mAwaiter;
+    struct EpollFileAwaiter *mAwaiter{};
 };
 
 struct EpollLoop {
-    inline void addListener(EpollFilePromise &promise);
+    inline void addListener(EpollFilePromise &promise, int ctl);
     inline void removeListener(int fileNo);
     inline bool run(std::optional<std::chrono::system_clock::duration> timeout =
                         std::nullopt);
@@ -58,19 +58,18 @@ struct EpollFileAwaiter {
     void await_suspend(std::coroutine_handle<EpollFilePromise> coroutine) {
         auto &promise = coroutine.promise();
         promise.mAwaiter = this;
-        mLoop.addListener(promise);
+        mLoop.addListener(promise, mCtlCode);
     }
 
     EpollEventMask await_resume() const noexcept {
         return mResumeEvents;
     }
 
-    using ClockType = std::chrono::system_clock;
-
     EpollLoop &mLoop;
     int mFileNo;
     EpollEventMask mEvents;
     EpollEventMask mResumeEvents;
+    int mCtlCode = EPOLL_CTL_ADD;
 };
 
 EpollFilePromise::~EpollFilePromise() {
@@ -79,13 +78,13 @@ EpollFilePromise::~EpollFilePromise() {
     }
 }
 
-void EpollLoop::addListener(EpollFilePromise &promise) {
+void EpollLoop::addListener(EpollFilePromise &promise, int ctl) {
     struct epoll_event event;
     event.events = promise.mAwaiter->mEvents;
     event.data.ptr = &promise;
-    checkError(
-        epoll_ctl(mEpoll, EPOLL_CTL_ADD, promise.mAwaiter->mFileNo, &event));
-    ++mCount;
+    checkError(epoll_ctl(mEpoll, ctl, promise.mAwaiter->mFileNo, &event));
+    if (ctl == EPOLL_CTL_ADD)
+        ++mCount;
 }
 
 void EpollLoop::removeListener(int fileNo) {
@@ -171,37 +170,37 @@ private:
 };
 
 inline Task<EpollEventMask, EpollFilePromise>
-wait_file(EpollLoop &loop, AsyncFile &file, EpollEventMask events) {
-    co_return co_await EpollFileAwaiter(loop, file.fileNo(),
-                                        events | EPOLLONESHOT);
+wait_file_event(EpollLoop &loop, AsyncFile &file, EpollEventMask events) {
+    co_return co_await EpollFileAwaiter(loop, file.fileNo(), events);
 }
 
-inline std::size_t read_file(AsyncFile &file, std::span<char> buffer) {
+inline std::size_t read_file_sync(AsyncFile &file, std::span<char> buffer) {
     ssize_t len = read(file.fileNo(), buffer.data(), buffer.size());
     if (len == -1) {
         if (errno != EWOULDBLOCK) [[unlikely]] {
             throw std::system_error(errno, std::system_category());
         }
+        len = 0;
     }
     return len;
 }
 
 inline Task<std::string> read_string(EpollLoop &loop, AsyncFile &file) {
-    co_await wait_file(loop, file, EPOLLIN);
+    co_await wait_file_event(loop, file, EPOLLIN | EPOLLET);
     std::string s;
-    size_t chunk = 8;
+    std::size_t chunk = 15;
     while (true) {
         char c;
         std::size_t exist = s.size();
         s.append(chunk, 0);
         std::span<char> buffer(s.data() + exist, chunk);
-        auto len = read_file(file, buffer);
+        auto len = read_file_sync(file, buffer);
         if (len != chunk) {
             s.resize(exist + len);
             break;
         }
         if (chunk < 65536)
-            chunk *= 4;
+            chunk *= 3;
     }
     co_return s;
 }

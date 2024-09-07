@@ -9,7 +9,7 @@ namespace co_async {
 struct AsyncLoop {
     void run() {
         while (true) {
-            auto timeout = mTimerLoop.tryRun();
+            auto timeout = mTimerLoop.run();
             if (mEpollLoop.hasEvent()) {
                 mEpollLoop.run(timeout);
             } else if (timeout) {
